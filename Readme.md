@@ -33,6 +33,8 @@ Tenemos unas cuantas opciones en AWS para desplegar una base de datos MONGO, si 
 - Document DB: Es un servicio gestionado comptible con Mongo, pero puede sr mas costoso y no ser compatible con las utlimas versiones. Dado que no se especifica la version en el planteamiento es mejor optar por una isntancia que podemos costumizar.
 - EC2 instance con una Mongo instalado, esto nos da control total sobre la version, manejar costos y la flexibilidad. Podriamos evaluar una instancia reservada para optimizar costos.
 
+Debemos considerar un plan de respaldo automatizados, podemos usar snapshots de EBS mediante algun cronjob o con eventos de EventBridge, ya que es una DB autoadministrada.
+
 ### NETWORKING
 Un balanceador de carga es indispensable para manejar el tráfico dirigido al frontend entre las tareas que pueda tenr el servicio de frontend, proporcionan un unico punto de acceso y maneja conexiones seguras HTTPS.
 Es buena practica usar un balanceador de carga interno al backend, de esta forma se comunican los 2 servicios.
@@ -47,14 +49,31 @@ BACKEND
 BASE DE DATOS
     - Limitar el tráfico de entrada solo desde el SG del backend hacia el puerto de la DB, usualmente 27017 para Mongo.
 
-### CONSIDERACIONES
-- En caso de que la aplicacion requiera almacenar 
+- Se deben usar roles especificos y politicas siguiendo el principio de minimo privilegio a través de IAM. 
 
+- Si se desea usar certificados gestionados o generador por AWS para la app web podemos hacerlo con AWS Certificate Manager que se integra de forma nativa con el balanceador de carga y servicios como Route53 y Cloudfront.
+
+### MONITOREO
+- Configurar alarmas en AWS Cloudwatch para monitoreo reactivo.
+
+## ARQUITECTURA PROPUESTA 
 ![Alt text](image-2.png)
 
+### ARQUITECTURA PROPUESTA CON ALTA DISPONIBILIDAD
 
+- Para asegurar la alta disponibilidad, configuramos el despliegue en 2 zonas de disponibilidad como mínimo. Los balanceadores de carga se encargaran de distribuir el tráfico.
+Para la instancia de DB se despliegan en un grupo de AutoScaling que maneje el despliegue segun parametros de rendimineto y carga. Quedando una arquitectura similiar a esta.
+![Alt text](image-3.png)
 
 ### MEJORAS
-- Se debe considerar levantar el proyecto a través de alguna herramienta IaC como Terraform o CodePipeline de AWS. Como pequeño ejemplo se definio un archivo de configuración de Terraform para levantar una base de datos con MongoDB en servicio. [Script]()
+- Se debe considerar levantar el proyecto a través de alguna herramienta IaC como Terraform o CloudFormation de AWS. Como pequeño ejemplo se definio un archivo de configuración de Terraform para levantar una base de datos con MongoDB en servicio. [Script](https://github.com/milunadev/PruebaTecnica_p2/blob/main/terraform/modulos/compute_db.tf)
 
-- 
+
+- Se puede considerar el uso de AWS Copilot para los desarrolladores. AWS Copilot es una herramienta de línea de comandos que ayuda a los desarrolladores a lanzar y operar contenedores en AWS con Amazon ECS y AWS Fargate.
+Simplifica todo el proceso de despliegue de infraestructura a traves de plantillas y comandos simples.
+
+- Se debe implementar un proceso de automatización, ya sea con Github Actions o AWS CodePipeline. CodePipeline puede ser bastante útil ya que puede tomar un repositorio de GitHub como origen del disparo y a partir de ahi usar infraestructura para la construcción con CodeBuild y el posterior despliegue con CodeDeploy. Se puede añadir una etapa de testing.
+    -  CodeBuild puede hacer uso de contenedores para contruir el artifact a partir de un Dockerfile que podemos tener en el repositorio, indicamos los pasos de la construcción como instalacion de dependencias y demás en el archivo buildspec.yaml.
+    - CodeDeploy se vale de CloudFormation para levantar y desplegar toda la infraestructura y los artifacts generados en el anterior paso.
+
+![Alt text](image-4.png)
